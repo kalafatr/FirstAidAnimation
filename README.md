@@ -1,9 +1,11 @@
 # First Aid Animation — IMU-Tracked VR Animation Scrubber
 
-A Unity/VR prototype where a trainee's real hand and head position — tracked by a custom
-Wi-Fi IMU rig, not a mouse or a timeline — drives which pose a training animation shows. Move
-your hand further along a guide path in physical space and the character's pose advances to
-match it, step by step through a multi-stage sequence.
+A Unity/VR prototype where grabbing a physical handle and sliding it along a guide path — not
+a mouse or a timeline — drives which pose a training animation shows, step by step through a
+multi-stage sequence. Alongside that mechanic, a custom Wi-Fi IMU rig ("Sonia") tracks a
+trainee's head/hand **orientation** and grip-button state over HTTP and feeds it into Unity's
+Input System as a real custom device (see the architecture below for exactly what each piece
+does and does not track).
 
 This repo is a cleaned-up, portfolio-safe export of an ongoing private project. It keeps every
 line of **original** code and fixes real bugs found while reviewing it; it deliberately leaves
@@ -17,7 +19,8 @@ out unrelated experiments and anything that belongs to Unity, Meta, or other thi
         │  HTTP GET, polled every `interval` seconds ("x/y/z/..." string response)
         ▼
  GetData_M.cs / GetData_S1.cs / GetData_S2.cs   (Scripts/Device)
-        │  parses the response, writes rotation/grip/position into shared fields
+        │  parses the response, writes orientation (+ grip, for the hand units) into
+        │  shared fields — see the note below on what's actually live vs. dead code
         ▼
  VRInputSender.cs   (Scripts/Device)
         │  holds the live headset + both hands' position/rotation/grip/joystick state;
@@ -47,6 +50,17 @@ out unrelated experiments and anything that belongs to Unity, Meta, or other thi
  AnimationLineManager.cs   (Scripts/Animation)
         (sequences a list of CreateAnimationLine segments into one multi-step exercise)
 ```
+
+**What's actually tracked, precisely:** none of `GetData_M`/`GetData_S1`/`GetData_S2` derive hand
+or head *position* from the sensors — only orientation (and grip, for the hand units). Of the
+three, `GetData_M` (headset) and `GetData_S1` (left hand) actively parse and forward that data;
+`GetData_S2` (right hand) currently only reads 3 raw accelerometer-like values per poll, and its
+rotation/grip-parsing code exists but is never invoked (see [Bugs found and
+fixed](#bugs-found-and-fixed-while-preparing-this-export)). `VRInputSender`'s position fields
+(`HS_positionx`, etc.) are only ever set from hardcoded defaults or the keyboard-simulation path,
+never from these sensors. The position that actually drives the grab-and-scrub mechanic above
+comes from the connected XR controller's own tracking (via the XR Origin, not vendored here),
+independent of this IMU pipeline.
 
 A separate, independent system for evaluating a trainee's movement:
 
@@ -103,10 +117,16 @@ declared in `Packages/manifest.json` and required to compile `SoniaDevice.cs`.
 Reviewing this code end-to-end (without a Unity install available to run it — see the note in
 [Running it](#running-it)) turned up a few concrete issues, fixed here:
 
-- **`GetData_S2.cs` wrote the right hand's live rotation into the *headset's* fields**
-  (`vrInputSender.HS_rotationx/y/z`) instead of `RH_rotationx/y/z`. Combined with `GetData_M`
-  also writing `HS_rotation*`, this meant the two sensors fought over the same fields and the
-  right hand's rotation was never actually updated from live data. Fixed to write `RH_rotation*`.
+- **`GetData_S2.cs`'s `AssignValue` wrote into the *headset's* rotation fields**
+  (`vrInputSender.HS_rotationx/y/z`) instead of `RH_rotationx/y/z` — stepping on the values
+  `GetData_M` actively drives. Note this doesn't restore "real" right-hand tracking: `GetData_S2`
+  only calls `AssignValue` with `"px"/"py"/"pz"` (raw accelerometer-like readings) in its current
+  parsing, so the `"rx"/"ry"/"rz"/"g"` cases that set `Masax`/`Masay`/`Masaz`/`Grip` are dead code
+  — those fields stay at their default (0 / false), unlike `GetData_S1` where the equivalent
+  parsing is live. So the values being written were always placeholders, not tracked
+  orientation; fixing the target field (to `RH_rotation*`/`RightGrip`) stops it from overwriting
+  `GetData_M`'s live headset data and matches `GetData_S1`'s `LH_*` pattern, but real right-hand
+  orientation tracking needs `GetData_S2`'s parsing restored to match `GetData_S1` first.
 - **Dead-on-arrival reconnect timeout** in all three `GetData_*` pollers: `lastDataReceivedTime`
   was reset to `Time.time` on *every* poll (success or failure) right before checking
   `Time.time - lastDataReceivedTime > timeoutDuration` — that difference is always ~0, so the

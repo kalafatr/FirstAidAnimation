@@ -126,10 +126,15 @@ public class GetData_S2 : MonoBehaviour
         if (HS_Gorunsun)
         {
             Hs.SetActive(true);
-            // NOTE: this previously wrote into vrInputSender.HS_rotation* (the headset fields already
-            // driven by GetData_M), so the right hand's rotation was never actually updated from live
-            // sensor data. GetData_S2 is the right-hand sensor (mirrors GetData_S1's LH_* wiring), so
-            // this now writes to RH_rotation* instead.
+            // NOTE: ParseAndAssignData only ever calls AssignValue with "px"/"py"/"pz" here, so the
+            // "rx"/"ry"/"rz"/"g" cases above (and therefore Masax/Masay/Masaz/Grip) are never actually
+            // set from live sensor data in this class - unlike GetData_S1, where the equivalent
+            // rotation/grip parsing is live. These fields are always their default (0 / false), so the
+            // values written below are placeholders, not tracked right-hand orientation, until S2's
+            // parsing is restored to match S1's. What this fix does change: it previously wrote those
+            // placeholders into vrInputSender.HS_rotation* (the headset fields GetData_M actively
+            // drives), which is still wrong regardless - GetData_S2 is the right-hand sensor (mirrors
+            // GetData_S1's LH_* wiring), so this now targets RH_rotation* instead.
             vrInputSender.RH_rotationx = Masax;
             vrInputSender.RH_rotationy = Masay;
             vrInputSender.RH_rotationz = Masaz;
