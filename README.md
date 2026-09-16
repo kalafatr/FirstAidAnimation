@@ -1,4 +1,4 @@
-# First Aid Animation — IMU-Tracked VR Animation Scrubber
+# First Aid Animation — Grab-Driven Animation Scrubber + Custom IMU Input Device
 
 A Unity/VR prototype where grabbing a physical handle and sliding it along a guide path — not
 a mouse or a timeline — drives which pose a training animation shows, step by step through a
@@ -7,8 +7,8 @@ trainee's head/hand **orientation** and grip-button state over HTTP and feeds it
 Input System as a real custom device (see the architecture below for exactly what each piece
 does and does not track).
 
-This repo is a cleaned-up, portfolio-safe export of an ongoing private project. It keeps every
-line of **original** code and fixes real bugs found while reviewing it; it deliberately leaves
+This repo is a cleaned-up, portfolio-safe export of an ongoing private project. It brings over
+the relevant **custom/original** project code and fixes real bugs found while reviewing it; it deliberately leaves
 out unrelated experiments and anything that belongs to Unity, Meta, or other third parties (see
 [What's not in this repo, and why](#whats-not-in-this-repo-and-why)).
 
