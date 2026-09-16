@@ -19,16 +19,16 @@ public class CreateAnimationLine : MonoBehaviour
     [SerializeField] private InputActionProperty rightGrip;
     public string AnimationName;
     public Animator animator;
-    [SerializeField] bool animatorTrigger = false;
     public float proximity;
 
     [SerializeField] bool averageX;
     [SerializeField] bool averageY;
     [SerializeField] bool averageZ;
 
-
     [Range(0f, 1f)]
     public float AnimationValue = 0f;
+
+    private readonly List<GameObject> spawnedPathPoints = new List<GameObject>();
 
     Transform AnimationHandle()
     {
@@ -71,10 +71,12 @@ public class CreateAnimationLine : MonoBehaviour
 
     private void Update()
     {
-        //if (AnimationValue == 1) return;
-        float distanceToFirstPoint = Vector3.Distance(AnimationHandle().position, firstPointTransform.position);
-        float distanceToMiddlePoint = Vector3.Distance(AnimationHandle().position, middlePointTransform.position);
-        float distanceToLastPoint = Vector3.Distance(AnimationHandle().position, lastPointTransform.position);
+        if (animator == null || string.IsNullOrEmpty(AnimationName)) return;
+
+        Transform handle = AnimationHandle();
+        float distanceToFirstPoint = Vector3.Distance(handle.position, firstPointTransform.position);
+        float distanceToMiddlePoint = Vector3.Distance(handle.position, middlePointTransform.position);
+        float distanceToLastPoint = Vector3.Distance(handle.position, lastPointTransform.position);
 
         if (distanceToFirstPoint <= proximity || distanceToMiddlePoint <= proximity || distanceToLastPoint <= proximity)
         {
@@ -83,25 +85,33 @@ public class CreateAnimationLine : MonoBehaviour
 
             if (distanceToFirstPoint <= distanceToLastPoint)
             {
+                if (totalDistanceFirstHalf <= 0f) return;
                 float ratio = distanceToFirstPoint / totalDistanceFirstHalf;
                 AnimationValue = ratio / 2;
             }
             else
             {
+                if (totalDistanceSecondHalf <= 0f) return;
                 float ratio = distanceToMiddlePoint / totalDistanceSecondHalf;
                 AnimationValue = 0.5f + ratio / 2;
             }
 
             animator.SetFloat(AnimationName, AnimationValue);
-            Debug.Log(AnimationValue);
         }
     }
 
     public void InstantiateObjectWithArc(Vector3 start, Vector3 middle, Vector3 end)
     {
+        foreach (GameObject point in spawnedPathPoints)
+        {
+            if (point != null) Destroy(point);
+        }
+        spawnedPathPoints.Clear();
+
         float distance1 = Vector3.Distance(start, middle);
         float distance2 = Vector3.Distance(middle, end);
-        int pointCount = Mathf.CeilToInt(distance1)+ Mathf.CeilToInt(distance2);
+        int pointCount = Mathf.CeilToInt(distance1) + Mathf.CeilToInt(distance2);
+        if (pointCount < 2) return;
 
         for (int i = 0; i < pointCount; i++)
         {
@@ -109,6 +119,7 @@ public class CreateAnimationLine : MonoBehaviour
             Vector3 point = CalculateArcPoint(start, middle, end, t);
             GameObject prefab = Instantiate(prefabToCreate, point, Quaternion.identity);
             prefab.transform.SetParent(transform);
+            spawnedPathPoints.Add(prefab);
             if (i < Mathf.CeilToInt(distance1))
             {
                 Vector3 direction = (middle - start).normalized;
